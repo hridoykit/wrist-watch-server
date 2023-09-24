@@ -1,8 +1,8 @@
-const express = require('express');
+const express = require("express");
 const app = express();
-const cors = require('cors');
-const { MongoClient, ServerApiVersion } = require('mongodb');
-require('dotenv').config();
+const cors = require("cors");
+const { MongoClient, ServerApiVersion, ObjectId } = require("mongodb");
+require("dotenv").config();
 const port = process.env.PORT | 5000;
 
 // middleware
@@ -17,39 +17,76 @@ const client = new MongoClient(uri, {
     version: ServerApiVersion.v1,
     strict: true,
     deprecationErrors: true,
-  }
+  },
 });
 
 async function run() {
   try {
     await client.connect();
 
-    const watchCollection = client.db('wristWatchDB').collection('watches');
+    const watchCollection = client.db("wristWatchDB").collection("watches");
 
-    app.get('/', (req, res) => {
-        res.send('wrist watch')
-    })
-    
-    app.get('/watches', async(req, res) => {
-        const findedWatch = watchCollection.find({});
-        const result = await findedWatch.toArray();
-        res.send(result);
+    app.get("/", (req, res) => {
+      res.send("wrist watch");
+    });
+
+    // read operation
+    app.get("/watches", async (req, res) => {
+      const data = watchCollection.find();
+      const result = await data.toArray();
+      res.send(result);
+    });
+
+    // to update, at first find a specific data
+    app.get("/watches/:id", async (req, res) => {
+      const id = req.params.id;
+      const query = { _id: new ObjectId(id) };
+      const result = await watchCollection.findOne(query);
+      res.send(result);
+    });
+
+    // update operation
+    app.put('/watches/:id', async(req, res) => {
+      const id = req.params.id;
+      const watch = req.body;
+      const filter = {_id : new ObjectId(id)};
+      const options = {upsert : true};
+      const updateWatch = {
+        $set : {
+          name : watch.name,
+          quantity : watch.quantity,
+          price : watch.price,
+          details : watch.details,
+          photo : watch.photo
+        }
+      };
+      const result = await watchCollection.updateOne(filter, updateWatch, options);
+      res.send(result);
     })
 
-    app.post('/watches', async(req, res) => {
-        const watch = req.body;
-        const result = await watchCollection.insertOne(watch)
-        res.send(result);   
-    })
+    // to get data from client side
+    app.post("/watches", async (req, res) => {
+      const watch = req.body;
+      const result = await watchCollection.insertOne(watch);
+      res.send(result);
+    });
+
+    app.delete("/watches/:id", async (req, res) => {
+      const id = req.params.id;
+      const query = { _id: new ObjectId(id) };
+      const result = await watchCollection.deleteOne(query);
+      res.send(result);
+    });
 
     await client.db("admin").command({ ping: 1 });
 
-    console.log("Pinged your deployment. You successfully connected to MongoDB!");
+    console.log(
+      "Pinged your deployment. You successfully connected to MongoDB!"
+    );
   } finally {
     // await client.close();
   }
 }
 run().catch(console.dir);
 
-
-app.listen(port, ()=> console.log(`wrist watch is running in ${port}`))
+app.listen(port, () => console.log(`wrist watch is running in ${port}`));
